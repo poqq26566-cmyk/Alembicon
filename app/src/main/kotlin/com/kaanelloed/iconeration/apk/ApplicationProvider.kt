@@ -354,7 +354,9 @@ class ApplicationProvider(private val context: Context) {
     private fun getAppFilterElements() {
         val map = mutableMapOf<IconPack, List<RawElement>>()
 
-        installedApplications = appManager.getAllInstalledApplications()
+        installedApplications = applicationList.map {
+            InstalledApplication(it.packageName, it.activityName, it.iconID)
+        }
 
         for (iconPack in iconPacks) {
             map[iconPack] = appManager.getAppFilterRawElements(iconPack.packageName, installedApplications)
