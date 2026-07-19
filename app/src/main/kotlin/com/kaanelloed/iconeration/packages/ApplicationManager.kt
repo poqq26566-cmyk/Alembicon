@@ -32,6 +32,50 @@ import org.xmlpull.v1.XmlPullParserFactory
 class ApplicationManager(private val ctx: Context) {
     private val pm = ctx.packageManager
 
+    private val iconCacheDir: java.io.File by lazy {
+        java.io.File(ctx.cacheDir, "icon_cache").apply { mkdirs() }
+    }
+
+    /** 先查本地缓存文件，没有才真的去解码图标并存一份缓存，下次启动直接读缓存 */
+    private fun loadIconCached(key: String, loadReal: () -> Drawable): Drawable {
+        val file = java.io.File(iconCacheDir, "$key.png")
+
+        if (file.exists()) {
+            val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+            if (bitmap != null) {
+                return android.graphics.drawable.BitmapDrawable(ctx.resources, bitmap)
+            }
+        }
+
+        val drawable = loadReal()
+
+        try {
+            val bitmap = drawableToBitmap(drawable)
+            java.io.FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+        } catch (e: Exception) {
+            // 存缓存失败不影响正常显示，下次还会重试
+        }
+
+        return drawable
+    }
+
+    private fun drawableToBitmap(drawable: Drawable): Bitmap {
+        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 108
+        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 108
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    /** 手动点刷新时调用，清空图标缓存，强制重新读取最新图标 */
+    fun clearIconCache() {
+        iconCacheDir.listFiles()?.forEach { it.delete() }
+    }
+
     fun getAllInstalledApplications(): List<InstalledApplication> {
         val apps = getAllInstalledApps()
         val packs = mutableListOf<InstalledApplication>()
@@ -58,8 +102,10 @@ class ApplicationManager(private val ctx: Context) {
                     val appName = app.applicationInfo.loadLabel(pm).toString()
                     val packageName = app.componentName.packageName
                     val activityName = app.componentName.className
-                    val icon = app.applicationInfo.loadIcon(pm)
                     val iconID = app.applicationInfo.icon
+                    val cacheKey = "${packageName}_${activityName}_$iconID"
+                        .replace(Regex("[^A-Za-z0-9_]"), "_")
+                    val icon = loadIconCached(cacheKey) { app.applicationInfo.loadIcon(pm) }
 
                     val icon2 = if (!icon.sizeIsGreaterThanZero()) {
                         Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).toDrawable(ctx.resources)
