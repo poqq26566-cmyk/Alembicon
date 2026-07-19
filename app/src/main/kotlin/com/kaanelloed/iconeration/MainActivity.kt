@@ -42,10 +42,12 @@ class MainActivity : ComponentActivity() {
 
         appProvider.defaultColor = if (this.isSystemInDarkTheme()) Color.White else Color.Black
 
-        appProvider.initializeApplications()
         CoroutineScope(Dispatchers.Default).launch {
-            appProvider.initializeIconPacks()
-        }
+    appProvider.initializeApplications()
+}
+CoroutineScope(Dispatchers.Default).launch {
+    appProvider.initializeIconPacks()
+}
         CoroutineScope(Dispatchers.Default).launch {
             appProvider.initializeAlchemiconPack()
         }
