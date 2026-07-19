@@ -368,6 +368,8 @@ class ApplicationProvider(private val context: Context) {
     }
 
     suspend fun forceSync() {
+        appManager.clearIconCache()
+        initializeApplications()
         if (iconPackLoaded) {
             initializeIconPacks()
         }
